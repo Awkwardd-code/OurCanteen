@@ -12,13 +12,21 @@ import Carousel from "react-native-reanimated-carousel";
 import { useTheme } from "@/context/ThemeContext";
 import { fetchAPI } from "@/lib/fetch";
 import { Cuisine } from "@/types";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = width * 0.25;
 const ITEM_HEIGHT = 100;
 
-const PopularCuisinesCarousel = () => {
+type PopularCuisinesCarouselProps = {
+  restaurantId: string; // receive restaurant_id as prop
+};
+
+const PopularCuisinesCarousel: React.FC<PopularCuisinesCarouselProps> = ({
+  restaurantId,
+}) => {
   const { theme } = useTheme();
+  const router = useRouter();
   const [cuisines, setCuisines] = useState<Cuisine[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +44,16 @@ const PopularCuisinesCarousel = () => {
 
     fetchCuisines();
   }, []);
+
+  const handleCuisinePress = (cuisineId: number, restaurantId: number) => {
+    router.push({
+      pathname: "/(root)/restaurant/cuisine",
+      params: {
+        restaurant_id: restaurantId.toString(),
+        cuisine_id: cuisineId.toString(),
+      },
+    });
+  };
 
   if (loading) {
     return (
@@ -58,7 +76,11 @@ const PopularCuisinesCarousel = () => {
         height={ITEM_HEIGHT}
         data={cuisines}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.item}>
+          <TouchableOpacity
+            style={styles.item}
+            onPress={() => handleCuisinePress(item.id, item.restaurant_id)}
+            activeOpacity={0.7}
+          >
             <View style={[styles.imageContainer, { backgroundColor: theme.colors.card }]}>
               {item.image ? (
                 <Image

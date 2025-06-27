@@ -10,10 +10,12 @@ import {
 } from "react-native";
 import { Overlay } from "./Overlay";
 import { useEffect, useRef } from "react";
+import { useNavigation } from '@react-navigation/native';
 
 export default function Home() {
   const qrLock = useRef(false);
   const appState = useRef(AppState.currentState);
+  const navigation = useNavigation();
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
@@ -52,7 +54,7 @@ export default function Home() {
           }
         }}
       />
-      <Overlay />
+      <Overlay onBack={() => navigation.goBack()} />
     </SafeAreaView>
   );
 }

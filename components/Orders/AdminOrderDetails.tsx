@@ -104,7 +104,7 @@ const AdminOrderDetails: React.FC<Props> = ({ item }) => {
       style={[styles.card, { width: ITEM_WIDTH }]}
     >
       {/* First row: Image and QR Code */}
-      <View style={styles.topRow}>
+      <View className="mb-9" style={styles.topRow}>
         <View style={styles.imageContainer}>
           {imageError || !item.image ? (
             <View style={styles.imagePlaceholder}>

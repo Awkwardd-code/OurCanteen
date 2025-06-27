@@ -4,7 +4,7 @@ import { useTheme } from '@/context/ThemeContext';
 import Header from '@/components/MenuBar/Header';
 import UserButton from '@/components/MenuBar/UserButton';
 import ActionButtons from '@/components/MenuBar/ActionButtons';
-import Favourites from '@/components/MenuBar/FavouriteOffer';
+// import Favourites from '@/components/MenuBar/FavouriteOffer';
 import SignOutButton from '@/components/MenuBar/LogoutHeader';
 
 type MenuItem = {

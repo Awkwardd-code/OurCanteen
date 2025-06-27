@@ -1,69 +1,47 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import React, { useCallback, useState, useEffect } from 'react';
+import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import HeaderWithSearch from '@/components/HeaderWithSearch';
-import OrderDetails from '@/components/Orders/OrderDetails';
+import CleanOrderCard, { CleanOrder } from '@/components/Orders/CleanOrderCard';  // new component import
 import { useTheme } from '@/context/ThemeContext';
-import { StatusBar } from 'expo-status-bar';
-import Loader from '@/components/Loader';
 import { fetchAPI } from '@/lib/fetch';
+import Loader from '@/components/Loader';
 import { useUser } from '@clerk/clerk-expo';
-
-interface Order {
-  id: number;
-  product_name: string;
-  image: string | null;
-  number: number;
-  amount: number;
-  price: number;
-  quantity: number;
-  is_paid: boolean;
-  student_id: number;
-  user_id: string;
-  restaurant_name: string;
-  cuisine_name: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import HeaderWithSearch from '@/components/HeaderWithSearch';
 
 const Orders = () => {
   const { theme } = useTheme();
   const { user } = useUser();
-  const [orders, setOrders] = useState<Order[]>([]);
+
+  const [orders, setOrders] = useState<CleanOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchOrders().finally(() => setRefreshing(false));
+  }, []);
 
   const fetchOrders = async () => {
-    if (!user?.id) {
-      setError('User not authenticated');
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
-      setError(null);
 
-      const data = await fetchAPI(`/(api)/order?user_id=${user.id}`, {
+      const data = await fetchAPI(`/(api)/order?user_id=${user?.id}`, {
         method: 'GET',
       });
 
-      if (!Array.isArray(data)) {
-        throw new Error('Invalid response format: Expected an array');
-      }
+      if (!Array.isArray(data)) throw new Error('Invalid response format');
 
-      // Validate and normalize orders
-      const normalizedOrders = data.map((order) => ({
+      // Normalize image to never be undefined
+      const normalizedOrders = data.map((order: any) => ({
         ...order,
-        id: order.id,
         image: order.image ?? null,
       }));
 
       setOrders(normalizedOrders);
     } catch (err: any) {
-      console.error('Failed to fetch orders:', err.message);
-      setError('Failed to load orders. Please try again.');
+      console.error('Failed to fetch orders:', err);
     } finally {
       setLoading(false);
     }
@@ -71,51 +49,45 @@ const Orders = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, [user?.id]); // Add user?.id as a dependency
+  }, []);
 
   if (loading) {
     return <Loader />;
   }
 
-  if (error) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <StatusBar style={theme.dark ? 'light' : 'dark'} />
-        <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>
-            {error}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar style={theme.dark ? 'light' : 'dark'} />
-      <View style={[styles.headerContainer, { backgroundColor: theme.colors.background }]}>
-        <HeaderWithSearch />
-      </View>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      edges={['top']}
+    >
+      {/* Sticky Header */}
+      <HeaderWithSearch />
+
+      {/* Orders List */}
       <FlatList
         data={orders}
-        keyExtractor={(item) => String(item.id)} // Convert id to string
-        renderItem={({ item }) => <OrderDetails item={item} />}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => <CleanOrderCard item={item} />}
         ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <Text style={[styles.title, { color: theme.colors.textPrimary }]}>
-              Your Orders
-            </Text>
+          <View style={styles.headerSection}>
+            <Text style={[styles.title, { color: theme.colors.text }]}>Orders</Text>
           </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: theme.colors.text }]}>No orders found.</Text>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-              No orders found
-            </Text>
-          </View>
-        }
+        keyboardShouldPersistTaps="handled"
       />
     </SafeAreaView>
   );
@@ -124,43 +96,28 @@ const Orders = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  headerContainer: {
-    zIndex: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  listHeader: {
-    paddingVertical: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    paddingHorizontal: 16,
+    marginBottom: 50,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+    gap: 16,
+  },
+  headerSection: {
+    gap: 16,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 16,
     alignItems: 'center',
-    paddingVertical: 40,
   },
   emptyText: {
     fontSize: 16,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    textAlign: 'center',
   },
 });
 

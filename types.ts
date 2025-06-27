@@ -44,11 +44,14 @@ export interface Offer {
   validUntil?: string;
 }
 
-export interface Cuisine {
+export type Cuisine = {
   id: number;
   name: string;
   image?: string;
-}
+  restaurant_id: number; // ✅ Add this line
+  created_at?: string;
+  updated_at?: string;
+};
 
 // Theme types
 export interface ThemeColors {

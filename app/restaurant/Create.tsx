@@ -22,11 +22,9 @@ import { fetchAPI } from '@/lib/fetch';
 import { useRouter } from 'expo-router';
 import { uploadImageToCloudinary } from '@/lib/cloudinaryUtils';
 
-
 const Create = () => {
   const { user } = useUser();
   const router = useRouter();
-
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
@@ -34,8 +32,9 @@ const Create = () => {
     name: '',
     address: '',
     district: '',
-    logo: '',
+    logo: '', // This will store the Cloudinary URL
   });
+
   /* ------------------Image---------------- */
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -45,32 +44,27 @@ const Create = () => {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      const uri = result.assets[0].uri;
-      setImageUri(uri);
-      const secureUrl = await uploadImageToCloudinary(uri, setUploading);
+      const localUri = result.assets[0].uri;
+      setImageUri(localUri);
+
+      // Upload to Cloudinary and get secure URL
+      const secureUrl = await uploadImageToCloudinary(localUri, setUploading);
       if (secureUrl) {
-        await storeImageUrl(secureUrl); // Save to your DB
+        // Update form.logo with Cloudinary URL for submission
+        setForm(prev => ({ ...prev, logo: secureUrl }));
       }
     }
   };
 
- 
-
-  const storeImageUrl = async (url: string) => {
-    // Make API request to your backend to store the URL in your DB
-    console.log('Storing image URL:', url);
-  };
-
-
   const handleSubmit = async () => {
     try {
-
       if (!user) {
         alert('You must be logged in to create a restaurant.');
         return;
       }
 
-      if (!form.name || !form.address || !form.district || !imageUri) {
+      // Validate all fields including logo URL
+      if (!form.name || !form.address || !form.district || !form.logo) {
         alert('All fields including logo are required.');
         return;
       }
@@ -81,14 +75,14 @@ const Create = () => {
           name: form.name,
           address: form.address,
           district: form.district,
-          logo: imageUri,
+          logo: form.logo, // Send Cloudinary URL, not local URI
           userId: user?.id,
         }),
       });
 
-      // console.log('Restaurant created:', response);
       alert('Restaurant created successfully!');
 
+      // Reset form and image preview
       setForm({
         name: '',
         address: '',
@@ -97,9 +91,8 @@ const Create = () => {
       });
       setImageUri(null);
 
-      // ✅ Navigate
+      // Navigate to admin home
       router.push('/(admin)/(tabs)/home');
-
     } catch (err: any) {
       console.error('Submit Error:', err);
       alert(
@@ -110,8 +103,6 @@ const Create = () => {
       );
     }
   };
-
-
 
   return (
     <KeyboardAvoidingView
@@ -170,8 +161,9 @@ const Create = () => {
               />
 
               <CustomButton
-                title="Submit"
+                title={uploading ? "Uploading..." : "Submit"}
                 onPress={handleSubmit}
+                disabled={uploading}
                 className="mt-6"
               />
             </View>

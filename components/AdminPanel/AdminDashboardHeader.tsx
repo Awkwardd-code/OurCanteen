@@ -173,7 +173,7 @@ const AdminDashboardHeader = ({ onSearchPress }: { onSearchPress?: () => void })
       </View>
 
       {/* Search Input */}
-      <View style={styles.searchContainer}>
+      {/* <View style={styles.searchContainer}>
         <GoogleTextInput
           icon={icons.search}
           containerStyle={styles.searchInput}
@@ -183,7 +183,7 @@ const AdminDashboardHeader = ({ onSearchPress }: { onSearchPress?: () => void })
           placeholder="Search restaurants or dishes..."
           // testID="dashboard-search-input"
         />
-      </View>
+      </View> */}
 
       {error && (
         <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>

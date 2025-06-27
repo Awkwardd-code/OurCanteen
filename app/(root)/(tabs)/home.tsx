@@ -11,7 +11,6 @@ import OffersSection from "@/components/Home/OffersSection";
 import PopularCuisinesCarousel from "@/components/Home/PopularCuisinesCarousel";
 import OurBengaliItemsCarousel from "@/components/Home/OurBengaliItemsCarousel";
 import OurMenu from "@/components/Home/OurMenu";
-import ComboOffers from "@/components/Home/ComboOffers";
 import AllRestaurants from "@/components/Home/AllRestaurants";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -52,7 +51,7 @@ const Home = () => {
             <OurBengaliItemsCarousel />
             <AllRestaurants />
             <OurMenu />
-            <ComboOffers />
+            {/* <ComboOffers /> */}
           </View>
         }
         keyboardShouldPersistTaps="handled"

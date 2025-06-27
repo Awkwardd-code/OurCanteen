@@ -22,7 +22,7 @@ const Offers = () => {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView className="mb-14" style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Sticky Header */}
       <View style={styles.headerContainer}>
         <HeaderWithSearch />

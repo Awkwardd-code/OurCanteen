@@ -51,7 +51,7 @@ const ActionButtons: React.FC = () => {
     fetchUser();
   }, [fetchUser]);
 
-  const fallbackAdminEmail = 'atikmahbubakash9@gmail.com';
+  const fallbackAdminEmail = 'dhruba.fahad2004@gmail.com';
   const isAdmin = userData?.is_admin === true || userData?.email === fallbackAdminEmail;
 
   if (loading) return <Loader />;
@@ -73,13 +73,13 @@ const ActionButtons: React.FC = () => {
             color={theme.colors.warning || '#FFC107'}
             onPress={() => router.push('/(admin)/(tabs)/home')}
           />
-          <ActionButton
+          {/* <ActionButton
             iconName="store"
             iconSet="FontAwesome5"
             label="Restaurant Page"
             color={theme.colors.success || '#4CAF50'}
             onPress={() => router.push('./restaurant')}
-          />
+          /> */}
         </View>
       )}
 
@@ -91,16 +91,16 @@ const ActionButtons: React.FC = () => {
           color={theme.colors.info || '#2196F3'}
           onPress={() => router.push('/orders')}
         />
-        <ActionButton
+        {/* <ActionButton
           iconName="delivery-dining"
           iconSet="MaterialIcons"
           label="Delivery Status"
           color={theme.colors.error || '#F44336'}
           onPress={() => router.push('./delivery-status')}
-        />
+        /> */}
       </View>
 
-      <View style={[styles.row, styles.centeredRow]}>
+     {/*  <View style={[styles.row, styles.centeredRow]}>
         <ActionButton
           iconName="admin-panel-settings"
           iconSet="MaterialIcons"
@@ -108,7 +108,7 @@ const ActionButtons: React.FC = () => {
           color={theme.colors.warning || '#FFC107'}
           onPress={() => router.push('/(root)/(tabs)/home')}
         />
-      </View>
+      </View> */}
     </View>
   );
 };

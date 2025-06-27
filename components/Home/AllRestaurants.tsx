@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable import/no-duplicates */
+
 import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
@@ -9,62 +9,53 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
+  RefreshControl,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { StackNavigationProp } from "@react-navigation/stack";
 import { fetchAPI } from "@/lib/fetch";
 import { Restaurant } from "@/types";
 import { useTheme } from "@/context/ThemeContext";
+import { useRouter } from "expo-router";
 import RestaurantCardSkeleton from "../Skeletons/RestaurantCardSkeleton";
-import { RefreshControl } from "react-native";
-
-type RootStackParamList = {
-  RestaurantDetails: { restaurantId: string };
-  // Add other screens here as needed
-};
-
-const PAGE_LIMIT = 10;
 
 interface Props {
   onPressRestaurant?: (restaurant: Restaurant) => void;
   showTitle?: boolean;
 }
 
-const AllRestaurants: React.FC<Props> = ({ onPressRestaurant, showTitle = true }) => {
+const AllRestaurants: React.FC<Props> = ({
+  onPressRestaurant,
+  showTitle = true,
+}) => {
   const { theme } = useTheme();
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const router = useRouter();
+
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRestaurants = async (pageNumber: number, isRefreshing = false) => {
+  const fetchRestaurants = async (isRefreshing = false) => {
     if (loading && !isRefreshing) return;
-    
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetchAPI(
-        `/(api)/restaurant?page=${pageNumber}&limit=${PAGE_LIMIT}`
-      );
-      
+      const response = await fetchAPI("/(api)/restaurant", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
       if (!response || response.length === 0) {
-        setHasMore(false);
+        setRestaurants([]);
+        setError("No restaurants found.");
       } else {
         const formattedData = response.map((r: any) => ({
           ...r,
           image: r.logo ? { uri: r.logo } : undefined,
-          rating: typeof r.rating === 'number' ? r.rating : 0,
+          rating: typeof r.rating === "number" ? r.rating : 0,
         }));
-
-        if (pageNumber === 1 || isRefreshing) {
-          setRestaurants(formattedData);
-        } else {
-          setRestaurants((prev) => [...prev, ...formattedData]);
-        }
+        setRestaurants(formattedData);
       }
     } catch (err) {
       setError("Failed to load restaurants. Please try again.");
@@ -77,37 +68,31 @@ const AllRestaurants: React.FC<Props> = ({ onPressRestaurant, showTitle = true }
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    setPage(1);
-    fetchRestaurants(1, true);
+    fetchRestaurants(true);
   }, []);
 
   useEffect(() => {
-    fetchRestaurants(1);
+    fetchRestaurants();
   }, []);
-
-  const handleLoadMore = () => {
-    if (hasMore && !loading && !refreshing) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchRestaurants(nextPage);
-    }
-  };
 
   const handlePressRestaurant = useCallback(
     (restaurant: Restaurant) => {
-      onPressRestaurant?.(restaurant) ||
-        navigation.navigate("RestaurantDetails", { restaurantId: restaurant.id });
+      onPressRestaurant?.(restaurant);
+      router.push({
+        pathname: "/(root)/restaurant/home",
+        params: { restaurant_id: restaurant.id.toString() },
+      });
     },
-    [navigation, onPressRestaurant]
+    [onPressRestaurant, router]
   );
 
   const renderFooter = () => {
     if (!loading) return null;
     return (
-      <ActivityIndicator 
-        size="large" 
-        color={theme.colors.primary} 
-        style={styles.loader} 
+      <ActivityIndicator
+        size="large"
+        color={theme.colors.primary}
+        style={styles.loader}
       />
     );
   };
@@ -124,10 +109,10 @@ const AllRestaurants: React.FC<Props> = ({ onPressRestaurant, showTitle = true }
             source={{ uri: item.image.uri }}
             style={styles.image}
             resizeMode="cover"
-            onError={() => console.log("Image failed to load")}
+            onError={() => console.log("Image failed to load for", item.name)}
           />
         ) : (
-          <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.imagePlaceholder}>
             <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
               No Image
             </Text>
@@ -136,44 +121,50 @@ const AllRestaurants: React.FC<Props> = ({ onPressRestaurant, showTitle = true }
       </View>
 
       <View style={styles.detailsContainer}>
-        <Text 
-          style={[styles.name, { color: theme.colors.text }]} 
-          numberOfLines={1}
-        >
+        <Text style={[styles.name, { color: theme.colors.text }]} numberOfLines={1}>
           {item.name}
         </Text>
-        
+
         <View style={styles.metaContainer}>
-          <Text style={[styles.cuisine, { color: theme.colors.primary }]} numberOfLines={1}>
+          <Text
+            style={[styles.cuisine, { color: theme.colors.primary }]}
+            numberOfLines={1}
+          >
             {item.cuisine || "Various Cuisines"}
           </Text>
           <View style={styles.ratingContainer}>
             <Text style={[styles.rating, { color: theme.colors.accent }]}>
-              ★ {typeof item.rating === 'number' ? item.rating.toFixed(1) : 'N/A'}
+              ★ {typeof item.rating === "number" ? item.rating.toFixed(1) : "N/A"}
             </Text>
           </View>
         </View>
 
-        <Text 
-          style={[styles.address, { color: theme.colors.textSecondary }]} 
+        <Text
+          style={[styles.address, { color: theme.colors.textSecondary }]}
           numberOfLines={2}
         >
           {item.address || "Address not available"}
         </Text>
-        
+
         <View style={styles.infoContainer}>
-          <Text style={[styles.infoText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+          <Text
+            style={[styles.infoText, { color: theme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
             {item.phone ? `📞 ${item.phone}` : "Phone not available"}
           </Text>
-          <Text style={[styles.infoText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-            {item.openingHours ? `🕒 ${item.openingHours}` : "Hours not available"}
-          </Text>
+          {/* <Text
+            style={[styles.infoText, { color: theme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {item.opening_hours ? `🕒 ${item.opening_hours}` : "Hours not available"}
+          </Text> */}
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  if (loading && page === 1 && !refreshing) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.skeletonContainer}>
         {[...Array(3)].map((_, i) => (
@@ -194,17 +185,13 @@ const AllRestaurants: React.FC<Props> = ({ onPressRestaurant, showTitle = true }
       )}
 
       {error && (
-        <Text style={[styles.error, { color: theme.colors.error }]}>
-          {error}
-        </Text>
+        <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
       )}
 
       <FlatList
         data={restaurants}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
@@ -215,7 +202,7 @@ const AllRestaurants: React.FC<Props> = ({ onPressRestaurant, showTitle = true }
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!showTitle}
+        scrollEnabled={true}
       />
     </View>
   );
@@ -263,6 +250,7 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f0f0f0",
   },
   placeholderText: {
     fontSize: 14,

@@ -61,6 +61,7 @@ const Orders = () => {
 
   return (
     <SafeAreaView
+
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       edges={['top']}
     >
@@ -95,6 +96,7 @@ const Orders = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    marginBottom : 50 ,
   },
   listContent: {
     paddingHorizontal: 16,

@@ -11,17 +11,19 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 
 import { icons } from '@/constants';
-import InputField from '@/components/InputField';
 import CustomButton from '@/components/CustomButton';
 import { fetchAPI } from '@/lib/fetch';
 import { useRouter } from 'expo-router';
 import { uploadImageToCloudinary } from '@/lib/cloudinaryUtils';
+import InputField from '@/components/InputFieldRestaurent';
 
 type Restaurant = {
   id: number;
@@ -42,6 +44,7 @@ const Update = () => {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [editImageUri, setEditImageUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [form, setForm] = useState({
     name: '',
     address: '',
@@ -49,11 +52,15 @@ const Update = () => {
     logo: '',
   });
 
+  // Inline validation errors state
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
   useEffect(() => {
     if (!user?.id) return;
 
     const fetchRestaurant = async () => {
       try {
+        setLoading(true);
         const response = await fetchAPI(`/(api)/restaurant?user_id=${user.id}`, {
           method: 'GET',
         });
@@ -75,6 +82,8 @@ const Update = () => {
       } catch (error) {
         console.error('Failed to load restaurant:', error);
         Alert.alert('Error', 'Failed to load restaurant data.');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -92,6 +101,7 @@ const Update = () => {
       const uri = result.assets[0].uri;
 
       try {
+        setUploading(true);
         const secureUrl = await uploadImageToCloudinary(uri, setUploading);
         if (secureUrl) {
           setEditImageUri(secureUrl);
@@ -100,8 +110,21 @@ const Update = () => {
       } catch (err) {
         console.error('Image upload failed:', err);
         Alert.alert('Image Upload Error', 'Failed to upload the image.');
+      } finally {
+        setUploading(false);
       }
     }
+  };
+
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+    if (!form.name.trim()) newErrors.name = 'Restaurant name is required';
+    if (!form.address.trim()) newErrors.address = 'Restaurant address is required';
+    if (!form.district.trim()) newErrors.district = 'Restaurant district is required';
+    if (!(form.logo || imageUri)) newErrors.logo = 'Restaurant logo is required';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
@@ -110,12 +133,11 @@ const Update = () => {
       return;
     }
 
-    const finalLogo = form.logo || imageUri;
-
-    if (!form.name || !form.address || !form.district || !finalLogo) {
-      Alert.alert('All fields including logo are required.');
+    if (!validateForm()) {
       return;
     }
+
+    const finalLogo = form.logo || imageUri;
 
     try {
       await fetchAPI(`/(api)/restaurant`, {
@@ -143,10 +165,11 @@ const Update = () => {
     }
   };
 
-  if (!restaurant) {
+  if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading restaurant data...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={{ marginTop: 12, fontSize: 16 }}>Loading restaurant data...</Text>
       </View>
     );
   }
@@ -156,59 +179,47 @@ const Update = () => {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View
-        style={{
-          paddingHorizontal: 20,
-          paddingTop: 40,
-          paddingBottom: 10,
-          flexDirection: 'row',
-          alignItems: 'flex-end',
-        }}
-      >
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, marginBottom: 4 }}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 30, marginLeft: 8, color: '#1F2937' }}>
-          Update Restaurant
-        </Text>
+        <Text style={styles.headerTitle}>Update Restaurant</Text>
       </View>
 
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}
+        contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={{ alignItems: 'center' }}>
-            <TouchableOpacity onPress={pickImage} style={{ marginBottom: 24 }}>
-              <View
-                style={{
-                  width: 128,
-                  height: 128,
-                  borderRadius: 64,
-                  backgroundColor: '#E5E7EB',
-                  overflow: 'hidden',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
+          <View style={{ alignItems: 'center', width: '100%' }}>
+            <TouchableOpacity
+              onPress={pickImage}
+              style={styles.imagePickerContainer}
+              accessibilityLabel="Pick restaurant logo"
+              accessibilityRole="button"
+            >
+              <View style={styles.imageWrapper}>
                 {editImageUri || imageUri ? (
                   <Image
                     source={{ uri: (editImageUri || imageUri) as string }}
-                    style={{ width: '100%', height: '100%' }}
+                    style={styles.image}
                     resizeMode="cover"
                   />
                 ) : (
                   <Image
                     source={icons.camera}
-                    style={{ width: 48, height: 48, opacity: 0.5 }}
+                    style={styles.cameraIcon}
                     resizeMode="contain"
                   />
                 )}
-
               </View>
-              <Text style={{ textAlign: 'center', marginTop: 8, color: '#6B7280' }}>
-                Tap to change logo
-              </Text>
+              <Text style={styles.imagePickerText}>Tap to change logo</Text>
+              {!!errors.logo && <Text style={styles.errorText}>{errors.logo}</Text>}
             </TouchableOpacity>
 
             <View style={{ width: '100%' }}>
@@ -218,6 +229,7 @@ const Update = () => {
                 icon={icons.person}
                 value={form.name}
                 onChangeText={(value) => setForm({ ...form, name: value })}
+                error={errors.name}
               />
               <InputField
                 label="Restaurant Address"
@@ -225,6 +237,7 @@ const Update = () => {
                 icon={icons.location}
                 value={form.address}
                 onChangeText={(value) => setForm({ ...form, address: value })}
+                error={errors.address}
               />
               <InputField
                 label="Restaurant District"
@@ -232,6 +245,7 @@ const Update = () => {
                 icon={icons.district}
                 value={form.district}
                 onChangeText={(value) => setForm({ ...form, district: value })}
+                error={errors.district}
               />
 
               <CustomButton
@@ -239,7 +253,13 @@ const Update = () => {
                 onPress={handleSubmit}
                 disabled={uploading}
                 style={{ marginTop: 24 }}
+                accessibilityLabel="Update restaurant details"
+                accessibilityRole="button"
               />
+              {uploading && (
+                <ActivityIndicator size="small" color="#2563EB" style={{ marginTop: 8, alignSelf: 'center' }} />
+              )}
+
             </View>
           </View>
         </TouchableWithoutFeedback>
@@ -247,5 +267,70 @@ const Update = () => {
     </KeyboardAvoidingView>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  backButton: {
+    padding: 8,
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 30,
+    marginLeft: 8,
+    color: '#1F2937',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  imagePickerContainer: {
+    marginBottom: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  imageWrapper: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  cameraIcon: {
+    width: 48,
+    height: 48,
+    opacity: 0.5,
+  },
+  imagePickerText: {
+    textAlign: 'center',
+    marginTop: 8,
+    color: '#6B7280',
+  },
+  errorText: {
+    marginTop: 4,
+    color: '#DC2626',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+});
 
 export default Update;

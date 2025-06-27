@@ -15,6 +15,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { useUser } from '@clerk/clerk-expo';
+import { fetchAPI } from '@/lib/fetch';
 
 type Order = {
   id: string;
@@ -25,12 +27,14 @@ type Order = {
   image?: ImageSourcePropType | string;
   quantity?: number;
   description?: string;
+  user_id: string;
   customerName?: string;
   deliveryAddress?: string;
 };
 
 const OrderSuccess = () => {
   const { theme } = useTheme();
+  const { user } = useUser();
   const router = useRouter();
   const { order } = useLocalSearchParams();
   console.log(order)
@@ -39,7 +43,6 @@ const OrderSuccess = () => {
   console.log('Order type:', typeof order);
 
   const parsedOrder = useMemo<Order | null>(() => {
-    // Early return if order is invalid
     if (!order || typeof order !== 'string') {
       console.log('Order invalid: not a string or undefined');
       return null;
@@ -51,15 +54,15 @@ const OrderSuccess = () => {
       const data = JSON.parse(decoded) as Partial<Order>;
       console.log('Parsed order data:', data);
 
-      // Temporarily relax validation to inspect data
-      // Original: if (!data.id || !data.name || !data.restaurant || !data.price) return null;
-      if (!data.id) {
-        console.log('Validation failed: missing id');
+      // Ensure required fields are present
+      if (!data.id || !data.user_id) {
+        console.log('Validation failed: missing id or user_id');
         return null;
       }
-      console.log(data)
+
       return {
         id: data.id,
+        user_id: data.user_id, // Now guaranteed to be string due to validation
         product_name: data.product_name || 'Unknown Item',
         restaurant_name: data.restaurant_name || 'Unknown Restaurant',
         price: data.price || '$0.00',
@@ -75,7 +78,7 @@ const OrderSuccess = () => {
       return null;
     }
   }, [order]);
- 
+
 
   const formattedDate = useMemo(() => {
     if (!parsedOrder?.orderDate) return 'N/A';
@@ -100,6 +103,23 @@ const OrderSuccess = () => {
   const handleBack = useCallback(() => {
     router.back();
   }, [router]);
+
+  const userId = user?.id;
+  const userIdFromOrder = parsedOrder?.user_id;
+
+  const getPaid = async () => {
+      await fetchAPI("/(api)/order", {
+      method: "PUT",
+      body: JSON.stringify({
+        id: userId,
+        is_paid : true,
+      }),
+    });
+  }
+
+  if (userId === userIdFromOrder) {
+    getPaid();
+  }
 
   if (!parsedOrder) {
     return (
@@ -183,7 +203,7 @@ const OrderSuccess = () => {
           <Text
             style={[styles.orderNumber, { color: theme.colors.textSecondary }]}
             accessible
-            // accessibilityLabel={`Order number ${parsedOrder.id.slice(0, 8).toUpperCase()}`}
+          // accessibilityLabel={`Order number ${parsedOrder.id.slice(0, 8).toUpperCase()}`}
           >
             {/* #{parsedOrder.id.slice(0, 8).toUpperCase()} */}
           </Text>

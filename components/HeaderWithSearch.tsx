@@ -35,7 +35,7 @@ const HeaderWithSearch = ({ onSearchPress }: { onSearchPress?: () => void }) => 
             </Text>
           </View>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             onPress={handleNotificationPress}
             style={[styles.notificationButton, { backgroundColor: theme.colors.card }]}
           >
@@ -44,16 +44,16 @@ const HeaderWithSearch = ({ onSearchPress }: { onSearchPress?: () => void }) => 
               style={[styles.notificationIcon, { tintColor: theme.colors.primary }]} 
               resizeMode="contain" 
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* Search Component */}
-        <GoogleTextInput
+        {/* <GoogleTextInput
           icon={icons.search}
           containerStyle={styles.searchInput}
           iconColor={theme.colors.primary}
           handlePress={onSearchPress}
-        />
+        /> */}
       </View>
     </View>
   );
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 0,
   },
   welcomeText: {
     fontSize: 20,
@@ -82,8 +82,8 @@ const styles = StyleSheet.create({
   },
 
   nameText: {
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     marginTop: 4, 
   },
   notificationButton: {
