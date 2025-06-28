@@ -34,7 +34,7 @@
       [
         "expo-router",
         {
-          "origin": "https://ryde.dev/"
+          "origin": "https://our-canteen.vercel.app/"
         }
       ],
       [
