@@ -28,9 +28,7 @@
       "package": "com.anonymous.ryde"
     },
     "web": {
-      "bundler": "metro",
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "bundler": "webpack"
     },
     "plugins": [
       [
