@@ -76,3 +76,57 @@ export async function GET(request: Request) {
     );
   }
 }
+
+
+export async function PUT(request: Request) {
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    const { id, name, address, district, logo, userId } = await request.json();
+
+    if (!id || !name || !address || !district || !userId) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields, including id" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const response = await sql`
+      UPDATE restaurants
+      SET
+        name = ${name},
+        address = ${address},
+        district = ${district},
+        logo = ${logo},
+        user_id = ${userId}
+      WHERE id = ${id}
+      RETURNING *;
+    `;
+
+    if (response.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Restaurant not found or not updated" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    return new Response(JSON.stringify(response[0]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("PUT /restaurant error:", error);
+    return new Response(
+      JSON.stringify({ error: "Internal Server Error" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+}

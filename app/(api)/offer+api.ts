@@ -37,11 +37,12 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
-    const url = new URL(request.url);
+    const url = new URL(request.url);            
     const id = url.searchParams.get("id");
 
     let response;
     if (id) {
+      // ✅ Fetch offer by ID
       response = await sql`SELECT * FROM offers WHERE id = ${id}`;
       if (response.length === 0) {
         return new Response(JSON.stringify({ error: "Offer not found" }), {
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
         headers: { "Content-Type": "application/json" },
       });
     } else {
+      // ✅ Fetch all offers
       response = await sql`SELECT * FROM offers ORDER BY created_at DESC`;
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -68,6 +70,7 @@ export async function GET(request: Request) {
     });
   }
 }
+
 export async function PUT(request: Request) {
   try {
     const sql = neon(process.env.DATABASE_URL!);

@@ -49,6 +49,7 @@ export default function Home() {
           if (data && !qrLock.current) {
             qrLock.current = true;
             setTimeout(async () => {
+              console.log(data)
               await Linking.openURL(data);
             }, 500);
           }

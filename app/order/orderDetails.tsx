@@ -170,8 +170,8 @@ const OrderDetails = () => {
             {deepLinkUrl ? (
               <View ref={qrRef} collapsable={false}>
                 <QRCode 
-                  value={deepLinkUrl} 
-                  size={160} 
+                  value={"https://console.cloudinary.com/app/c-4dfa72486f5945f541cefbf516a007/assets/media_library/homepage"} 
+                  size={160}
                   color={theme.colors.text || '#292F36'} 
                   backgroundColor={theme.colors.backgroundSecondary || '#F9FAFB'}
                 />

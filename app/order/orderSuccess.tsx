@@ -108,17 +108,19 @@ const OrderSuccess = () => {
   const userIdFromOrder = parsedOrder?.user_id;
 
   const getPaid = async () => {
-      await fetchAPI("/(api)/order", {
+    await fetchAPI("/(api)/order", {
       method: "PUT",
       body: JSON.stringify({
-        id: userId,
-        is_paid : true,
+        id: parsedOrder?.id,
+        is_paid: true,
       }),
     });
   }
 
   if (userId === userIdFromOrder) {
     getPaid();
+  } else {
+    console.log("mile nai");
   }
 
   if (!parsedOrder) {

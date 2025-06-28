@@ -126,7 +126,7 @@ const Update = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
+  console.log(restaurant)
   const handleSubmit = async () => {
     if (!user) {
       Alert.alert('You must be logged in to update the restaurant.');
@@ -140,7 +140,7 @@ const Update = () => {
     const finalLogo = form.logo || imageUri;
 
     try {
-      await fetchAPI(`/(api)/restaurant`, {
+      /* await fetchAPI(`/(api)/restaurant`, {
         method: 'PUT',
         body: JSON.stringify({
           id: restaurant?.id,
@@ -150,7 +150,20 @@ const Update = () => {
           logo: finalLogo,
           user_id: user?.id,
         }),
+      }); */
+      const updatedRestaurant = await fetchAPI("/(api)/restaurant", {
+        method: "PUT",
+        body: JSON.stringify({
+          id: restaurant?.id, // ✅ Dummy restaurant ID
+          name: form.name,
+          address: form.address,
+          district: form.district,
+          logo: finalLogo,
+          userId: user?.id, // ✅ Dummy user ID
+        }),
       });
+
+      console.log("Updated restaurant:", updatedRestaurant);
 
       Alert.alert('Restaurant updated successfully!');
       router.push('/(admin)/(tabs)/home');
