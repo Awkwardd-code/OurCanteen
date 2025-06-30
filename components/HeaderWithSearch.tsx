@@ -11,27 +11,29 @@ import { useTheme } from "@/context/ThemeContext";
 import { icons } from "@/constants";
 import GoogleTextInput from "./GoogleTextInput";
 import { useUser } from "@clerk/clerk-react";
+import { useAuth } from "@/context/AuthContext";
 
 const HeaderWithSearch = ({ onSearchPress }: { onSearchPress?: () => void }) => {
   const { theme } = useTheme();
   const navigation = useNavigation();
-  const { user } = useUser();
+  // const { user } = useUser();
+  const { isAuthenticated, user } = useAuth();
 
   const handleNotificationPress = () => {
     navigation.navigate("Notifications" as never);
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container]}>
       <View style={styles.headerContent}>
         {/* Top Section: Welcome and Notification */}
         <View style={styles.topSection}>
-          <View style={styles.welcomeContainer}>
-            <Text style={[styles.welcomeText, { color: theme.colors.text }]}>
+          <View style={styles.welcomeContainer} className="px-4">
+            <Text style={[styles.welcomeText]} className="text-gray-50">
               Welcome 👋
             </Text>
-            <Text style={[styles.nameText, { color: theme.colors.text }]}>
-              {user?.fullName}
+            <Text style={[styles.nameText]} className="text-gray-100">
+              {user?.name}
             </Text>
           </View>
 
@@ -61,7 +63,7 @@ const HeaderWithSearch = ({ onSearchPress }: { onSearchPress?: () => void }) => 
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    // padding: ,
     paddingBottom: 8,
   },
   headerContent: {

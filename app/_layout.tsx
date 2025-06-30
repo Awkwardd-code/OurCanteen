@@ -1,11 +1,13 @@
-
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import { ClerkProvider } from '@clerk/clerk-expo'
-import { tokenCache } from '@clerk/clerk-expo/token-cache'
+import React from 'react';
 import 'react-native-reanimated';
 import "@/global.css";
+// import { AuthProvider } fro../context/AuthContextext';
+import AuthProvider from '../context/AuthContext';
 
+// import { ClerkProvider } from '@clerk/clerk-expo'
+// import { tokenCache } from '@clerk/clerk-expo/token-cache'
 
 export default function RootLayout() {
 
@@ -26,21 +28,19 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider tokenCache={tokenCache}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(root)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(admin)" options={{ headerShown: false }} />
-        <Stack.Screen name="restaurant" options={{ headerShown: false }} />
-         <Stack.Screen name="product" options={{ headerShown: false }} />
-         <Stack.Screen name="order" options={{ headerShown: false }} />
-         
-        <Stack.Screen name="+not-found" />
-      </Stack>
+    <AuthProvider>
+        <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(root)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(admin)" options={{ headerShown: false }} />
+          {/* <Stack.Screen name="restaurant" options={{ headerShown: false }} /> */}
+          <Stack.Screen name="product" options={{ headerShown: false }} />
+          <Stack.Screen name="order" options={{ headerShown: false }} />
 
-    </ClerkProvider>
-
+          <Stack.Screen name="+not-found" />
+        </Stack>
+    </AuthProvider>
 
   );
 }

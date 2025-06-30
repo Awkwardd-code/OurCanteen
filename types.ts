@@ -1,18 +1,18 @@
 // Restaurant related types
 export interface Restaurant {
-  id: string;
+  _id: string;
   name: string;
-  cuisine: string;
-  rating: number;
-  address: string;
-  phone: string;
-  openingHours: string;
-  logo?: string;
-  image?: { uri: string };
-  deliveryTime?: string;
-  minOrder?: number;
-  isOpen?: boolean;
-  tags?: string[];
+  institute: string;
+  // rating: number;
+  location: string;
+  banner: string;
+  // phone: string;
+  // openingHours: string;
+  // image?: { uri: string };
+  // deliveryTime?: string;
+  // minOrder?: number;
+  // isOpen?: boolean;
+  // tags?: string[];
 }
 
 // Menu item types

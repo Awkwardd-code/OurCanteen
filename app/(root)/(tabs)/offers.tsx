@@ -6,7 +6,6 @@ import {
   StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import HeaderWithSearch from "@/components/HeaderWithSearch";
 import OfferSlider from "@/components/Offers/OfferSlider";
 import { SpecialItemOffersList } from "@/components/Offers/SpecialItemOffers";
 import { useTheme } from "@/context/ThemeContext";
@@ -22,14 +21,15 @@ const Offers = () => {
   }, []);
 
   return (
-    <SafeAreaView className="mb-14" style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView className="bg-red-800 pb-16" style={[styles.container]}>
       {/* Sticky Header */}
       <View style={styles.headerContainer}>
-        <HeaderWithSearch />
+        {/* <HeaderWithSearch /> */}
       </View>
 
       {/* Content */}
       <FlatList
+        className="bg-white pb-9"
         data={[]}
         keyExtractor={(_, index) => `empty-${index}`}
         renderItem={null}
@@ -69,10 +69,10 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   contentContainer: {
-    paddingBottom: 16,
+    // paddingBottom: 8,
   },
   footerContainer: {
-    paddingTop: 24,
+    // paddingTop: 0,
     marginTop: 16,
   },
   listContent: {

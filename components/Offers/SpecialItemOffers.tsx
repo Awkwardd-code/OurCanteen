@@ -14,9 +14,10 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Dimensions } from "react-native";
-import { fetchAPI } from "@/lib/fetch";
 import { NativeStackNavigationProp } from "react-native-screens/lib/typescript/native-stack/types";
 import { useTheme } from "@/context/ThemeContext";
+import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
 
 // Navigation type (assuming a stack navigator)
 type RootStackParamList = {
@@ -27,36 +28,12 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 // Types
 interface SpecialItemOffer {
   id: string;
-  name: string;
-  type: string;
-  cuisine: string;
-  description: string;
+  title: string;
   discount: string;
   image: ImageSourcePropType | null;
-  offerEndDate: string;
-  restaurant: string;
-}
-
-interface Cuisine {
-  id: number;
-  name: string;
-}
-
-interface Restaurant {
-  id: number;
-  name: string;
-}
-
-interface ApiSpecialOffer {
-  id: string;
-  name: string;
-  type: string;
-  cuisine_id: number;
-  description: string;
-  discount: string;
-  image_url: string;
-  offer_end_date: string;
-  restaurant_id: number;
+  createdAt: string;
+  updatedAt: string;
+  restaurantName: string;
 }
 
 interface Props {
@@ -80,55 +57,44 @@ const SpecialItemOffers: React.FC<Props> = ({ item, onPressOffer, theme }) => {
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       onPress={handlePress}
-      accessibilityLabel={`${item.name} special offer at ${item.restaurant}`}
+      accessibilityLabel={`${item.title} special offer`}
       accessibilityRole="button"
       style={[
         styles.itemContainer,
-        { 
+        {
           backgroundColor: theme.colors.cardBackground,
           shadowColor: theme.colors.shadow,
         }
       ]}
     >
-      <View
-        style={[styles.imageContainer, { width: ITEM_WIDTH - ITEM_PADDING * 2 }]}
-      >
+      <View style={[styles.imageContainer, { width: ITEM_WIDTH - ITEM_PADDING * 2 }]}>
         {item.image ? (
           <Image
             source={item.image}
             style={styles.image}
             resizeMode="cover"
-            onError={() => console.log(`Failed to load ${item.name} image`)}
+            onError={() => console.log(`Failed to load ${item.title} image`)}
           />
         ) : (
           <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.placeholder }]}>
             <Text style={{ color: theme.colors.textSecondary }}>No Image</Text>
           </View>
         )}
+        <View style={styles.discountBadge}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>{item.discount}% OFF</Text>
+        </View>
       </View>
       <View style={[styles.contentContainer, { width: ITEM_WIDTH - ITEM_PADDING * 2 }]}>
-        <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-          {item.name}
+        <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+          {item.title}
         </Text>
-        <Text style={[styles.discount, { color: theme.colors.accent }]} numberOfLines={1}>
-          {item.discount} % Off
-        </Text>
-        <Text style={[styles.detail, { color: theme.colors.primary }]} numberOfLines={1}>
-          Restaurant: {item.restaurant}
-        </Text>
-        <Text style={[styles.detail, { color: theme.colors.primary }]} numberOfLines={1}>
-          Type: {item.type}
-        </Text>
-        <Text style={[styles.detail, { color: theme.colors.primary }]} numberOfLines={1}>
-          Cuisine: {item.cuisine}
-        </Text>
-        <Text style={[styles.description, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-          {item.description}
+        <Text style={[styles.restaurant, { color: '#8e24aa' }]} numberOfLines={1}>
+          {item.restaurantName}
         </Text>
         <Text style={[styles.date, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-          Offer Ends: {item.offerEndDate}
+          Added: {new Date(item.createdAt).toLocaleDateString()}
         </Text>
       </View>
     </TouchableOpacity>
@@ -141,35 +107,32 @@ export const SpecialItemOffersList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const { theme } = useTheme();
+  const { user, token } = useAuth();
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      const [restaurantData, cuisineData, offerData] = await Promise.all([
-        fetchAPI(`/(api)/restaurant`),
-        fetchAPI(`/(api)/cuisine`),
-        fetchAPI(`/(api)/special_offer`),
-      ]);
-
-      // Validate API responses
-      if (!Array.isArray(restaurantData) || !Array.isArray(cuisineData) || !Array.isArray(offerData)) {
+      const response = await axios.get("https://ourcanteennbackend.vercel.app/api/offer", {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const offerData = response.data;
+      if (!Array.isArray(offerData)) {
         throw new Error("Invalid API response format");
       }
-
-      const mappedOffers: SpecialItemOffer[] = offerData.map((offer) => ({
-        id: offer.id,
-        name: offer.name,
-        type: offer.type,
-        cuisine: cuisineData.find((c) => c.id === offer.cuisine_id)?.name || "Unknown",
-        description: offer.description,
-        discount: offer.discount,
+      // Map API data to SpecialItemOffer type (only available fields)
+      const mappedOffers: SpecialItemOffer[] = offerData.map((offer: any) => ({
+        id: offer._id || '',
+        title: offer.title || '',
+        discount: offer.discount ? String(offer.discount) : '',
         image: offer.image && typeof offer.image === "string" ? { uri: offer.image } : null,
-        offerEndDate: offer.offer_end_date,
-        restaurant: restaurantData.find((r) => r.id === offer.restaurant_id)?.name || "Unknown",
+        createdAt: offer.created_at || '',
+        updatedAt: offer.updated_at || '',
+        restaurantName: offer.restaurant_name || '',
       }));
-
       setComboOffers(mappedOffers);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load offers. Please try again later.";
@@ -221,9 +184,11 @@ export const SpecialItemOffersList: React.FC = () => {
 
   return (
     <View style={styles.listContainer}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-        Special Item Offers
-      </Text>
+      <View className="p-4 " style={{ backgroundColor: theme.colors.card }}>
+        <Text className="text-2xl font-bold text-center" style={{ color: theme.colors.text }}>
+          Avilable Offers
+        </Text>
+      </View>
       {comboOffers.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
@@ -256,66 +221,70 @@ export const SpecialItemOffersList: React.FC = () => {
 
 const styles = StyleSheet.create({
   itemContainer: {
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 12,
+    borderRadius: 14,
+    marginBottom: 18,
+    padding: 0,
     width: ITEM_WIDTH,
     alignSelf: 'center',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+    overflow: 'hidden',
   },
   imageContainer: {
-    borderRadius: 12,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    height: 180,
+    height: 170,
+    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderRadius: 0,
   },
   imagePlaceholder: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  discountBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: '#e53935',
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    zIndex: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   contentContainer: {
-    paddingTop: 8,
+    padding: 14,
+    backgroundColor: 'transparent',
   },
   title: {
-    fontSize: 18,
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  restaurant: {
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
-  },
-  discount: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  detail: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  description: {
-    fontSize: 12,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   date: {
     fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
+    fontWeight: '400',
+    marginTop: 2,
   },
   listContainer: {
     width: '100%',

@@ -1,19 +1,21 @@
+/* eslint-disable import/no-unresolved */
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useRouter } from 'expo-router';
 
 const SignOutButton: React.FC = () => {
-  const { signOut } = useAuth();
   const { theme } = useTheme();
   const router = useRouter();
 
+  const { logout } = useAuth();
+  
   const handleSignOut = async () => {
     try {
-      await signOut();
+      await logout();
       console.log('Signed out successfully');
-      router.replace('/(auth)/welcome'); // 👈 Redirect here
+      router.replace('/(auth)/welcome'); 
     } catch (error) {
       console.error('Sign-out failed:', error);
     }

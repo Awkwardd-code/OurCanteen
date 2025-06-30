@@ -1,4 +1,4 @@
-import { TextInput, View, Text, Image } from "react-native";
+import { TextInput, View, Text } from "react-native";
 import { InputFieldProps } from "@/types/type";
 
 const InputField = ({
@@ -22,9 +22,7 @@ const InputField = ({
       <View
         className={`flex flex-row items-center bg-neutral-100 rounded-md border border-neutral-100 ${containerStyle}`}
       >
-        {icon && (
-          <Image source={icon} className={`w-6 h-6 ml-4 ${iconStyle}`} />
-        )}
+        {icon && <View className={`ml-4 ${iconStyle}`}>{icon}</View>}
         <TextInput
           className={`flex-1 rounded-full p-4 font-JakartaSemiBold text-[15px] text-left ${inputStyle}`}
           secureTextEntry={secureTextEntry}

@@ -1,3 +1,4 @@
+/* eslint-disable import/no-unresolved */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useState } from "react";
 import {
@@ -5,15 +6,18 @@ import {
   Text,
   Image,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
   RefreshControl,
-  Dimensions
+  Dimensions,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { fetchAPI } from "@/lib/fetch";
+import axios from "axios";
 import { useTheme } from "@/context/ThemeContext";
 import Loader from "../Loader";
+import { useAuth } from "@/context/AuthContext";
+
+const screenWidth = Dimensions.get("window").width;
+const carouselItemWidth = screenWidth * 0.92; // 92% of screen width for margins (4% each side)
 
 type MenuItem = {
   id: number;
@@ -25,14 +29,7 @@ type MenuItem = {
   offer_id?: number;
   specialities?: string;
   restaurant_id?: number;
-};
-type Cuisine = {
-  id: number;
-  name: string;
-};
-type Restaurant = {
-  id: number;
-  name: string;
+  restaurant_name?: string;
 };
 
 const OurMenu = () => {
@@ -40,49 +37,27 @@ const OurMenu = () => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [cuisineMap, setCuisineMap] = useState<Record<number, string>>({});
-  const [restaurantMap, setRestaurantMap] = useState<Record<number, string>>({});
-
-
   const router = useRouter();
-  const screenWidth = Dimensions.get('window').width;
+  const { token } = useAuth();
 
   const fetchData = async () => {
     try {
       setLoading(true);
-
-      const [products, cuisines, restaurants] = await Promise.all([
-        fetchAPI("/(api)/product"),
-        fetchAPI("/(api)/cuisine"),
-        fetchAPI("/(api)/restaurant"),
-      ]);
-
-      setMenuItems(Array.isArray(products) ? products : []);
-
-      const cuisineMap: Record<number, string> = {};
-      if (Array.isArray(cuisines)) {
-        cuisines.forEach((c: Cuisine) => {
-          cuisineMap[c.id] = c.name;
-        });
-      }
-      setCuisineMap(cuisineMap);
-
-      const restaurantMap: Record<number, string> = {};
-      if (Array.isArray(restaurants)) {
-        restaurants.forEach((r: { id: number; name: string }) => {
-          restaurantMap[r.id] = r.name;
-        });
-      }
-      setRestaurantMap(restaurantMap);
-
+      const MenuData = await axios.get("https://ourcanteennbackend.vercel.app/api/product", {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      console.log('MenuData.data:', MenuData.data);
+      setMenuItems(Array.isArray(MenuData.data) ? MenuData.data : []);
     } catch (error) {
-      console.error("Failed to fetch menu, cuisines, or restaurants:", error);
+      console.error("Failed to fetch menu:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
-
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -93,164 +68,121 @@ const OurMenu = () => {
     fetchData();
   }, []);
 
-
   const handlePressItem = (item: MenuItem) => {
-    const cuisineName = cuisineMap[item.cuisine_id] ?? "Unknown";
-    const restaurantName = item.restaurant_id && restaurantMap[item.restaurant_id]
-      ? restaurantMap[item.restaurant_id]
-      : "Unknown";
+    console.log("Pressed item:", item);
 
-
+    // item.restaurant_name = item.restaurant_name || "No restaurant name"; // Ensure restaurant_name is defined
     router.push({
       pathname: "/product/productDetails",
       params: {
         product: JSON.stringify(item),
-        restaurant_name: restaurantName,
-        cuisine_name: cuisineName,
       },
     });
   };
 
-
-  const renderItem = ({ item }: { item: MenuItem }) => (
-    <TouchableOpacity
-      onPress={() => handlePressItem(item)}
-      style={[styles.itemContainer, {
-        backgroundColor: theme.colors.card,
-        width: screenWidth - 32 // Full width minus horizontal padding
-      }]}
-    >
-      <View style={styles.itemContent}>
-        {item.image ? (
-          <Image
-            source={{ uri: item.image }}
-            style={styles.itemImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.background }]}>
-            <Text style={{ color: theme.colors.textSecondary }}>No Image</Text>
-          </View>
-        )}
-
-        <View style={styles.textContainer}>
-          <Text style={[styles.itemName, { color: theme.colors.text }]}>
-            {item.name}
-          </Text>
-          <Text style={[styles.itemPrice, { color: theme.colors.primary }]}>
-            ৳ {item.price || "0.00"}
-          </Text>
-          {item.description && (
-            <Text
-              style={[styles.itemDescription, { color: theme.colors.textSecondary }]}
-              numberOfLines={2}
-            >
-              {item.description}
-            </Text>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  if (loading && !refreshing) {
-    return <Loader />;
-  }
+  if (loading && !refreshing) return <Loader />;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{ paddingBottom: 20 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={theme.colors.primary}
+        />
+      }
+    >
+      <View className="p-4 mb-4" style={{ backgroundColor: theme.colors.card }}>
+        <Text className="text-2xl font-bold text-center" style={{ color: theme.colors.text }}>
           Our Menu
         </Text>
       </View>
+      {/* Debug: Show MenuData array
+      {menuItems.length > 0 && (
+        <View style={{ marginHorizontal: 16, marginBottom: 12, backgroundColor: '#f3f4f6', borderRadius: 8, padding: 8 }}>
+          <Text style={{ fontSize: 12, color: '#333' }} selectable>
+            {JSON.stringify(menuItems, null, 2)}
+          </Text>
+        </View>
+      )} */}
 
-      <FlatList
-        data={menuItems}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
-        ListEmptyComponent={
-          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+      {menuItems.length > 0 ? (
+        <View style={{ paddingHorizontal: 8 }}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={item.id ? String(item.id) : item.name + index}
+              onPress={() => handlePressItem(item)}
+              style={{
+                flexDirection: 'row',
+                backgroundColor: theme.colors.card,
+                borderRadius: 12,
+                marginBottom: 12,
+                overflow: 'hidden',
+                minHeight: 100,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#f1f1f1',
+              }}
+              accessibilityLabel={`View details for ${item.name}`}
+              accessibilityRole="button"
+            >
+              {item.image && typeof item.image === 'string' && item.image.startsWith('http') ? (
+                <Image
+                  source={{ uri: item.image }}
+                  style={{ width: 90, height: 90, borderTopLeftRadius: 12, borderBottomLeftRadius: 12, backgroundColor: '#f3f4f6' }}
+                  resizeMode="cover"
+                  onError={() => console.log(`Failed to load image for ${item.name}`)}
+                />
+              ) : (
+                <View
+                  style={{ width: 90, height: 90, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background, borderTopLeftRadius: 12, borderBottomLeftRadius: 12 }}
+                >
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>No Image</Text>
+                </View>
+              )}
+              <View style={{ flex: 1, paddingVertical: 12, paddingHorizontal: 14, justifyContent: 'center' }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text, marginBottom: 2 }} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                {/* Show restaurant name if available */}
+                {item.restaurant_name && (
+                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 3 }} className="font-bold" numberOfLines={1}>
+                    {item.restaurant_name}
+                  </Text>
+                )}
+                {item.description && (
+                  <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 6 }} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                )}
+                <Text style={{ fontSize: 13, fontWeight: '500', color: theme.colors.primary, marginTop: 2 }}>
+                  ৳ {item.price ?? '0.00'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (
+        <View className="items-center mt-10">
+          <Text
+            className="text-base"
+            style={{ color: theme.colors.textSecondary }}
+          >
             No menu items available
           </Text>
-        }
-      />
-    </View>
+          <TouchableOpacity
+            onPress={handleRefresh}
+            className="mt-4 px-4 py-2 rounded-lg"
+            style={{ backgroundColor: theme.colors.primary }}
+          >
+            <Text className="text-white font-semibold">Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    marginBottom: 40,
-  },
-  header: {
-    padding: 16,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  itemContainer: {
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  itemContent: {
-    flexDirection: 'row',
-  },
-  itemImage: {
-    width: 100,
-    height: 100,
-  },
-  imagePlaceholder: {
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  textContainer: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'center',
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  itemPrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  itemDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 40,
-    fontSize: 16,
-  },
-});
 
 export default OurMenu;

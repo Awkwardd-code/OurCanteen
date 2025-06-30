@@ -1,7 +1,5 @@
-/* eslint-disable react/no-unescaped-entities */
 import {
   View,
-  Alert,
   Text,
   ScrollView,
   Image,
@@ -9,306 +7,223 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
+  TouchableOpacity,
 } from "react-native";
 import React, { useState } from "react";
 import { icons, images } from "@/constants";
 import InputField from "@/components/InputField";
 import CustomButton from "@/components/CustomButton";
-import { Link, useRouter } from "expo-router";
-import { useSignUp, useUser } from "@clerk/clerk-expo";
-import OAuth from "@/components/OAuth";
+import { useRouter } from "expo-router";
 import ReactNativeModal from "react-native-modal";
-import { fetchAPI } from "@/lib/fetch";
+import axios from "axios";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialIcons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
+import { useAuth } from "@/context/AuthContext";
 
 const SignUp = () => {
-  const { isLoaded, signUp, setActive } = useSignUp();
-  const { user } = useUser();
   const router = useRouter();
 
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
-  });
-
-  const [verification, setVerification] = useState({
-    state: "default",
-    error: "",
-    code: "",
+    institute: "",
+    studentId: "",
+    phoneNumber: "880",
   });
 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [avaInstitution, setAvaInstitution] = useState([
+    { id: "111", name: "University of Dhaka(DU)" },
+    { id: "112", name: "University of Rajshahi(RU)" },
+    { id: "113", name: "Rangpur Medical College(RpMC)" },
+  ]);
 
-  /* const onSignUpPress = async () => {
-    if (!isLoaded) return;
-    try {
-      // Create account
-      await signUp.create({
-        emailAddress: form.email,
-        password: form.password,
-      });
+  const { setAuth } = useAuth();
 
-      // Split full name
-      const [firstName, ...rest] = form.name.trim().split(" ");
-      const lastName = rest.join(" ");
-
-      // Update first and last name
-      await signUp.update({
-        firstName,
-        lastName,
-      });
-
-      // Send verification email
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-
-      setVerification((prev) => ({
-        ...prev,
-        state: "pending",
-      }));
-    } catch (err: any) {
-      console.log("SignUp error:", JSON.stringify(err, null, 2));
-      Alert.alert("Error", err.errors?.[0]?.longMessage || "Sign up failed.");
-    }
+  // Helper function to validate email format
+  const isValidEmail = (email: string) => {
+    // Simple regex for email validation
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const onPressVerify = async () => {
-    if (!isLoaded) return;
-    try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code: verification.code,
-      });
+  // Helper function to serialize phone number (remove non-digits and limit to 13 chars)
+  const serializePhoneNumber = (phone: string) => {
+    return phone.replace(/\D/g, "").slice(0, 13);
+  };
 
-      if (completeSignUp.status === "complete") {
-        await fetchAPI("/(api)/user", {
-          method: "POST",
-          body: JSON.stringify({
-            name: form.name,
-            email: form.email,
-            clerkId: completeSignUp.createdUserId,
-          }),
-        });
-
-        await setActive({ session: completeSignUp.createdSessionId });
-
-        // Wait for the user session to be active
-        setTimeout(async () => {
-          if (user) {
-            await (user as any).update({
-              publicMetadata: {
-                fullName: form.name,
-              },
-            });
-
-
-          }
-          setVerification((prev) => ({
-            ...prev,
-            state: "success",
-          }));
-        }, 500); // small delay to ensure user is available
-      } else {
-        setVerification((prev) => ({
-          ...prev,
-          error: "Verification failed. Please try again.",
-        }));
-      }
-    } catch (err: any) {
-      setVerification((prev) => ({
-        ...prev,
-        error: err.errors?.[0]?.longMessage || "Verification error",
-      }));
-    }
-  }; */
   const onSignUpPress = async () => {
-    if (!isLoaded) return;
+    setErrorMsg("");
+    // Validate for empty fields
+    const emptyField = Object.entries(form).find(([key, value]) => !value.trim());
+    if (emptyField) {
+      setErrorMsg(`Please fill in your ${emptyField[0].replace(/([A-Z])/g, ' $1').toLowerCase()}.`);
+      setShowErrorModal(true);
+      return;
+    }
+    // Validate password length
+    if (form.password.length < 6) {
+      setErrorMsg("Password must be at least 6 characters long.");
+      setShowErrorModal(true);
+      return;
+    }
+    // Validate email format
+    if (!isValidEmail(form.email)) {
+      setErrorMsg("Please enter a valid email address.");
+      setShowErrorModal(true);
+      return;
+    }
+    // Validate phone number: must start with 8801 and be exactly 13 digits
+    const serializedPhone = serializePhoneNumber(form.phoneNumber);
+    if (!/^8801\d{9}$/.test(serializedPhone)) {
+      setErrorMsg("Phone number must start with 8801 and be exactly 13 digits.");
+      setShowErrorModal(true);
+      return;
+    }
+    // Serialize phone number before sending
+    const serializedForm = {
+      ...form,
+      phoneNumber: serializedPhone,
+    };
     try {
-      // Create account
-      await signUp.create({
-        emailAddress: form.email,
-        password: form.password,
-      });
+      const response = await axios.post(
+        "https://ourcanteennbackend.vercel.app/api/auth/signup",
+        serializedForm
+      );
+      console.log("User saved:", response.data);
 
-      // Send verification email
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      if (response.data.token && response.data.user) {
 
-      setVerification((prev) => ({
-        ...prev,
-        state: "pending",
-      }));
+        setAuth({ user: response.data.user, token: response.data.token });
+        // Optionally store auth token here using SecureStore or AsyncStorage
+        // await SecureStore.setItemAsync("authToken", response.data.token);
+        router.replace("/(root)/(tabs)/home");
+      } else {
+        setErrorMsg(response.data?.message || "Try again.");
+        setShowErrorModal(true);
+      }
+
+      setShowSuccessModal(true);
     } catch (err: any) {
-      console.log("SignUp error:", JSON.stringify(err, null, 2));
-      Alert.alert("Error", err.errors?.[0]?.longMessage || "Sign up failed.");
+      const apiError = err.response?.data?.error;
+      const fallbackMsg = err.response?.data?.message || err.message;
+      const error = apiError || fallbackMsg || "Something went wrong.";
+      setErrorMsg(error);
+      setShowErrorModal(true);
+      console.error("Signup error:", error);
     }
   };
-
-  const onPressVerify = async () => {
-  if (!isLoaded) return;
-  try {
-    const completeSignUp = await signUp.attemptEmailAddressVerification({
-      code: verification.code,
-    });
-
-    if (completeSignUp.status === "complete") {
-      // Split full name
-      
-
-      // Save user data to your backend
-      await fetchAPI("/(api)/user", {
-        method: "POST",
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          clerkId: completeSignUp.createdUserId,
-        }),
-      });
-
-      // Set active session
-      await setActive({ session: completeSignUp.createdSessionId });
-
-      // Update Clerk user metadata or first/last name
-      setTimeout(async () => {
-        if (user) {
-          await user.update({
-            username : form.name,
-          });
-        }
-        setVerification((prev) => ({
-          ...prev,
-          state: "success",
-        }));
-      }, 500); // Small delay to ensure user is available
-    } else {
-      setVerification((prev) => ({
-        ...prev,
-        error: "Verification failed. Please try again.",
-      }));
-    }
-  } catch (err: any) {
-    setVerification((prev) => ({
-      ...prev,
-      error: err.errors?.[0]?.longMessage || "Verification error",
-    }));
-  }
-};
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView
-          className="flex-1 bg-white"
-          contentContainerStyle={{ paddingBottom: 20 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="flex-1 bg-white">
-            {/* Header Image */}
-            <View className="relative w-full h-[250px]">
-              <Image
-                source={images.signUpCar}
-                className="z-0 w-full h-full"
-                resizeMode="cover"
-              />
-              <Text className="text-2xl text-black font-JakartaSemiBold absolute bottom-5 left-5">
-                Create Your Account
-              </Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{ paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View className="relative w-full h-[100px] mb-2">
+              <View style={{ position: "absolute", bottom: 24, left: 24 }}>
+                <Text className="text-3xl text-black font-JakartaBold mb-1">
+                  Create Your Account
+                </Text>
+                <Text className="text-base text-neutral-500 font-Jakarta">
+                  Sign up to get started
+                </Text>
+              </View>
             </View>
 
             {/* Form */}
-            <View className="p-5">
+            <View
+              className="p-5 bg-white mx-4 mt-2 rounded-2xl shadow-md"
+              style={{
+                shadowColor: '#000',
+                shadowOpacity: 0.06,
+                shadowRadius: 12,
+                elevation: 2,
+              }}
+            >
               <InputField
                 label="Name"
                 placeholder="Enter name"
-                icon={icons.person}
+                icon={<MaterialIcons name="person" size={20} color="#888" />}
                 value={form.name}
                 onChangeText={(value) => setForm({ ...form, name: value })}
               />
               <InputField
                 label="Email"
                 placeholder="Enter email"
-                icon={icons.email}
+                icon={<MaterialIcons name="email" size={20} color="#888" />}
                 value={form.email}
                 onChangeText={(value) => setForm({ ...form, email: value })}
               />
               <InputField
                 label="Password"
                 placeholder="Enter password"
-                icon={icons.lock}
+                icon={<MaterialIcons name="lock" size={20} color="#888" />}
                 secureTextEntry
                 value={form.password}
                 onChangeText={(value) => setForm({ ...form, password: value })}
               />
-
-              {verification.error !== "" && (
-                <Text className="text-red-500 text-sm mt-1">
-                  {verification.error}
-                </Text>
-              )}
-
+              {/* Institution Picker (Unified Design) */}
+              <View className="my-2 w-full">
+                <Text className="text-lg font-JakartaSemiBold mb-3">Institution</Text>
+                <View className="flex flex-row items-center bg-neutral-100 rounded-md border border-neutral-100">
+                  <MaterialIcons name="school" size={20} color="#888" style={{ marginLeft: 10 }} />
+                  <Picker
+                    selectedValue={form.institute}
+                    onValueChange={(itemValue) => setForm({ ...form, institute: itemValue })}
+                    style={{ flex: 1, height: 48, marginLeft: 2 }}
+                    dropdownIconColor="#888"
+                  >
+                    <Picker.Item label="Select Institution" value="" />
+                    {avaInstitution.map((inst) => (
+                      <Picker.Item key={inst.id} label={inst.name} value={inst.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+              <InputField
+                label="Student Id"
+                placeholder="Enter Student Id"
+                icon={<MaterialIcons name="badge" size={20} color="#888" />}
+                value={form.studentId}
+                onChangeText={(value) => setForm({ ...form, studentId: value })}
+              />
+              <InputField
+                label="Phone Number"
+                placeholder="Enter Phone Number"
+                icon={<MaterialIcons name="phone" size={20} color="#888" />}
+                value={form.phoneNumber}
+                onChangeText={(value) =>
+                  setForm({ ...form, phoneNumber: serializePhoneNumber(value) })
+                }
+              />
               <CustomButton
                 title="Sign Up"
                 onPress={onSignUpPress}
                 className="mt-6"
               />
-
-              <OAuth />
-
-              <Link
-                href="/sign-in"
-                className="text-lg text-center text-general-200 mt-10"
+              <TouchableOpacity
+                onPress={() => router.push("/(auth)/sign-in")}
+                style={{ marginTop: 40 }}
+                activeOpacity={0.7}
               >
-                Already have an account?{" "}
-                <Text className="text-primary-500">Log In</Text>
-              </Link>
+                <Text style={{ textAlign: 'center', fontSize: 16, color: '#64748b' }}>
+                  Already have an account?{' '}
+                  <Text style={{ color: '#3b82f6', fontWeight: 'bold' }}>Log In</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Verification Modal */}
-            <ReactNativeModal
-              isVisible={verification.state === "pending"}
-              avoidKeyboard
-              onModalHide={() => {
-                if (verification.state === "success") {
-                  setShowSuccessModal(true);
-                }
-              }}
-            >
-              <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={{ flex: 1, justifyContent: "center" }}
-              >
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                  <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
-                    <Text className="font-JakartaExtraBold text-2xl mb-2">
-                      Verification
-                    </Text>
-                    <Text className="font-Jakarta mb-5">
-                      We've sent a verification code to {form.email}.
-                    </Text>
-                    <InputField
-                      label={"Code"}
-                      icon={icons.lock}
-                      placeholder={"12345"}
-                      value={verification.code}
-                      keyboardType="numeric"
-                      onChangeText={(code) =>
-                        setVerification({ ...verification, code })
-                      }
-                    />
-                    {verification.error && (
-                      <Text className="text-red-500 text-sm mt-1">
-                        {verification.error}
-                      </Text>
-                    )}
-                    <CustomButton
-                      title="Verify Email"
-                      onPress={onPressVerify}
-                      className="mt-5 bg-success-500"
-                    />
-                  </View>
-                </TouchableWithoutFeedback>
-              </KeyboardAvoidingView>
-            </ReactNativeModal>
 
             {/* Success Modal */}
             <ReactNativeModal isVisible={showSuccessModal}>
@@ -318,10 +233,10 @@ const SignUp = () => {
                   className="w-[110px] h-[110px] mx-auto my-5"
                 />
                 <Text className="text-3xl font-JakartaBold text-center">
-                  Verified
+                  Registered
                 </Text>
                 <Text className="text-base text-gray-400 font-Jakarta text-center mt-2">
-                  You have successfully verified your account.
+                  Your account has been created successfully.
                 </Text>
                 <CustomButton
                   title="Browse Home"
@@ -333,10 +248,26 @@ const SignUp = () => {
                 />
               </View>
             </ReactNativeModal>
-          </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+
+            {/* Error Modal */}
+            <ReactNativeModal isVisible={showErrorModal} onBackdropPress={() => setShowErrorModal(false)}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 24, padding: 28, minHeight: 180, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 20, elevation: 8 }}>
+                <View style={{ backgroundColor: '#ffeaea', borderRadius: 50, padding: 16, marginBottom: 18 }}>
+                  <MaterialIcons name="error-outline" size={40} color="#ff4d4f" />
+                </View>
+                <Text style={{ color: '#ff4d4f', fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>Oops!</Text>
+                <Text style={{ color: '#333', fontSize: 16, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>{errorMsg}</Text>
+                <CustomButton
+                  title="Close"
+                  onPress={() => setShowErrorModal(false)}
+                  style={{ width: 120, borderRadius: 8, backgroundColor: '#ff4d4f' }}
+                />
+              </View>
+            </ReactNativeModal>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 

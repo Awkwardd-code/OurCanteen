@@ -1,3 +1,4 @@
+/* eslint-disable import/no-unresolved */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -25,18 +26,20 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { fetchAPI } from "@/lib/fetch";
-import { useUser } from "@clerk/clerk-expo";
+import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
+import { set } from "date-fns";
 
 interface Product {
-  id: string;
+  _id: string;
   name: string;
   price: number;
   image: string;
   specialities: string;
   description: string;
   rating?: number;
-  restaurant_name?: string;
+  restaurant_name: string;
+  restaurant_id?: string;
   cuisine_id: number;
   cuisine_name?: string;
 }
@@ -55,68 +58,27 @@ const QuantitySelector = ({
   onIncrease: () => void;
   onDecrease: () => void;
 }) => {
-  const scaleValue = useRef(new Animated.Value(1)).current;
-  const opacityValue = useRef(new Animated.Value(1)).current;
-
-  const animateButton = useCallback((direction: "in" | "out") => {
-    Animated.parallel([
-      Animated.timing(scaleValue, {
-        toValue: direction === "in" ? 0.9 : 1,
-        duration: 100,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityValue, {
-        toValue: direction === "in" ? 0.7 : 1,
-        duration: 100,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [scaleValue, opacityValue]);
-
   return (
-    <View style={styles.quantityContainer}>
-      <Text style={styles.quantityLabel}>Quantity</Text>
-      <View style={styles.quantityControls}>
-        <TouchableOpacity
-          onPressIn={() => animateButton("in")}
-          onPressOut={() => animateButton("out")}
-          onPress={onDecrease}
-          style={styles.quantityButton}
-          accessibilityLabel="Decrease quantity"
-          accessibilityRole="button"
-          activeOpacity={1}
-        >
-          <Animated.View
-            style={{
-              transform: [{ scale: scaleValue }],
-              opacity: opacityValue,
-            }}
-          >
-            <Ionicons name="remove" size={20} color="#4b7bec" />
-          </Animated.View>
-        </TouchableOpacity>
-        <Text style={styles.quantityValue}>{quantity}</Text>
-        <TouchableOpacity
-          onPressIn={() => animateButton("in")}
-          onPressOut={() => animateButton("out")}
-          onPress={onIncrease}
-          style={styles.quantityButton}
-          accessibilityLabel="Increase quantity"
-          accessibilityRole="button"
-          activeOpacity={1}
-        >
-          <Animated.View
-            style={{
-              transform: [{ scale: scaleValue }],
-              opacity: opacityValue,
-            }}
-          >
-            <Ionicons name="add" size={20} color="#4b7bec" />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.quantityContainerMinimal}>
+      <TouchableOpacity
+        onPress={onDecrease}
+        style={styles.quantityButtonMinimal}
+        accessibilityLabel="Decrease quantity"
+        accessibilityRole="button"
+        activeOpacity={0.7}
+      >
+        <Ionicons name="remove" size={22} color="#3867d6" />
+      </TouchableOpacity>
+      <Text style={styles.quantityValueMinimal}>{quantity}</Text>
+      <TouchableOpacity
+        onPress={onIncrease}
+        style={styles.quantityButtonMinimal}
+        accessibilityLabel="Increase quantity"
+        accessibilityRole="button"
+        activeOpacity={0.7}
+      >
+        <Ionicons name="add" size={22} color="#3867d6" />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -124,18 +86,20 @@ const QuantitySelector = ({
 const ProductDetails = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { user } = useUser();
+  // const { user } = useUser();
   const { restaurant_name, cuisine_name } = useLocalSearchParams();
   const [quantity, setQuantity] = useState(1);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [orderDetails, setOrderDetails] = useState<OrderDetails>({
-    phone: "",
-    student_id: "",
-  });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  const [qrOrderId, setQrOrderId] = useState<string | null>(null);
+  const [qrUserId, setQrUserId] = useState<string | null>(null);
+
+  const { token, user } = useAuth();
 
   const product = useMemo(() => {
     try {
@@ -143,7 +107,7 @@ const ProductDetails = () => {
 
       return {
         ...parsed,
-        restaurant_name: restaurant_name ?? "",
+        // restaurant_name: restaurant_name ?? "",
         cuisine_name: cuisine_name ?? "",
       };
     } catch (error) {
@@ -202,41 +166,45 @@ const ProductDetails = () => {
   const handlePlaceOrder = useCallback(async () => {
     if (!product) return;
 
-    if (!validateInputs(orderDetails)) return;
+    let orderData = {
+      productId: product._id.toString(),
+      price: product.price,
+      quantity,
+      userId: user?.id,
+      image: product.image,
+      studentId: user?.studentId,
+      email: user?.email,
+      restaurant_id: product.restaurant_id,
+      restaurant_name: product.restaurant_name
+    }
+
+    console.log("Order Data:", orderData);
 
     setIsSubmitting(true);
     try {
-      await fetchAPI("/(api)/order", {
-        method: "POST",
-        body: JSON.stringify({
-          product_name: product.name,
-          number: orderDetails.phone,
-          amount: product.price * quantity,
-          price: product.price,
-          quantity,
-          user_id: user?.id,
-          is_paid: false,
-          image: product.image,
-          student_id: orderDetails.student_id,
-          restaurant_name: product.restaurant_name ?? "",
-          cuisine_name: product.cuisine_name ?? "",
-        }),
+      let resp = await axios.post("https://ourcanteennbackend.vercel.app/api/order", orderData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
+      console.log("Order Response:", resp.data);
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        "Order Placed",
-        `Your order for ${quantity} ${product.name}(s) has been placed. We'll contact you shortly.`
-      );
+
+
+      setQrOrderId(resp.data.id || resp.data._id);
+      setQrUserId(resp.data.userId);
+
       setIsModalVisible(false);
-      setOrderDetails({ student_id: "", phone: "" });
+      setShowSuccessModal(true);
     } catch (error) {
       Alert.alert("Error", "Failed to place order. Please try again.");
       console.error("Order submission error:", error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [orderDetails, product, quantity, user?.id]);
+  }, [product, quantity, user?.id]);
 
   const totalAmount = useMemo(() => {
     return product ? (product.price * quantity).toLocaleString() : "0";
@@ -245,26 +213,21 @@ const ProductDetails = () => {
   if (!product) return null;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeAreaMinimal}>
       {!isModalVisible && (
         <ScrollView
-          contentContainerStyle={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContainerMinimal}
           showsVerticalScrollIndicator={false}
         >
           {/* Image Section */}
-          <View style={styles.imageContainer}>
-            {imageLoading && !imageError && (
-              <View style={styles.loaderContainer}>
-                <ActivityIndicator size="large" color="#4B7bec" />
-              </View>
-            )}
+          <View style={styles.imageContainerMinimal}>
             <Image
               source={
                 imageError || !product.image
                   ? { uri: "https://via.placeholder.com/600x400?text=No+Image" }
                   : { uri: product.image }
               }
-              style={styles.productImage}
+              style={styles.productImageMinimal}
               resizeMode="cover"
               onLoad={() => setImageLoading(false)}
               onError={() => {
@@ -273,73 +236,64 @@ const ProductDetails = () => {
               }}
             />
             <TouchableOpacity
-              style={styles.backButton}
+              style={styles.backButtonMinimal}
               onPress={router.back}
               accessibilityLabel="Go back"
               accessibilityRole="button"
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back" size={24} color="#2d3436" />
+              <Ionicons name="arrow-back" size={24} color="#222" />
             </TouchableOpacity>
           </View>
 
           {/* Content Section */}
-          <View style={styles.contentContainer}>
-            <View style={styles.titleRow}>
-              <Text style={styles.productName} numberOfLines={2}>
-                {product.name}
+          <View style={styles.contentContainerMinimal}>
+            <Text style={styles.productNameMinimal} numberOfLines={2}>
+              {product.name}
+            </Text>
+            {/* Show restaurant name above price */}
+            {product.restaurant_name && (
+              <Text style={{ fontSize: 14, color: '#8e24aa', fontWeight: '600', marginBottom: 2 }} numberOfLines={1}>
+                {product.restaurant_name}
               </Text>
-              {product.rating && (
-                <View style={styles.ratingContainer}>
-                  <Ionicons name="star" size={18} color="#f39c12" />
-                  <Text style={styles.ratingText}>
-                    {product.rating.toFixed(1)}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.price}>৳ {product.price.toLocaleString()}</Text>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Specialities</Text>
-              <View style={styles.specialitiesContainer}>
-                {product.specialities.split(",").map((item, index) => (
-                  <View key={index} style={styles.specialityTag}>
-                    <Text style={styles.specialityText}>{item.trim()}</Text>
+            )}
+            {product.rating && (
+              <View style={styles.ratingContainerMinimal}>
+                <Ionicons name="star" size={16} color="#f39c12" />
+                <Text style={styles.ratingTextMinimal}>
+                  {product.rating.toFixed(1)}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.priceMinimal}>৳ {product.price.toLocaleString()}</Text>
+            {/* Specialities restored */}
+            {product.specialities && (
+              <View style={styles.specialitiesBoxMinimal}>
+                {product.specialities.split(",").map((item, idx) => (
+                  <View key={idx} style={styles.specialityTagMinimalBox}>
+                    <Text style={styles.specialityMinimalTextBox}>
+                      {item.trim()}
+                    </Text>
                   </View>
                 ))}
               </View>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.sectionContent}>
-                {product.description || "No description available"}
-              </Text>
-            </View>
-
+            )}
+            <Text style={styles.sectionContentMinimal}>
+              {product.description || "No description available"}
+            </Text>
             <QuantitySelector
               quantity={quantity}
               onIncrease={increaseQty}
               onDecrease={decreaseQty}
             />
-
             <TouchableOpacity
-              style={styles.orderButton}
+              style={styles.orderButtonMinimal}
               onPress={handleOrderNow}
               activeOpacity={0.9}
             >
-              <LinearGradient
-                colors={["#4b7bec", "#3867d6"]}
-                style={styles.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.orderButtonText}>
-                  Order Now - ৳ {totalAmount}
-                </Text>
-              </LinearGradient>
+              <Text style={styles.orderButtonTextMinimal}>
+                Order Now • ৳ {totalAmount}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -347,129 +301,134 @@ const ProductDetails = () => {
 
       {/* Order Modal */}
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={isModalVisible}
         onRequestClose={() => !isSubmitting && setIsModalVisible(false)}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.modalContainer}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
-          >
-            <View
-              style={[
-                styles.modalOverlay,
-                {
-                  backgroundColor:
-                    keyboardHeight > 0 ? "rgba(0,0,0,1)" : "rgba(0,0,0,0.5)",
-                },
-              ]}
-            />
-            <View
-              style={[
-                styles.modalContent,
-                {
-                  height: keyboardHeight > 0 ? "100%" : "85%",
-                },
-              ]}
+          <View style={styles.popupOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.popupContainer}
+              keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
             >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Complete Your Order</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => !isSubmitting && setIsModalVisible(false)}
-                  disabled={isSubmitting}
-                >
-                  <Ionicons name="close" size={24} color="#636e72" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                style={styles.modalScroll}
-                contentContainerStyle={styles.modalScrollContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                <TextInput
-                  style={styles.input}
-                  placeholder="Student Id"
-                  placeholderTextColor="#95a5a6"
-                  value={orderDetails.student_id}
-                  onChangeText={(text) =>
-                    setOrderDetails((prev) => ({ ...prev, student_id: text }))
-                  }
-                  autoCapitalize="words"
-                  returnKeyType="next"
-                  editable={!isSubmitting}
-                />
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="Phone Number"
-                  placeholderTextColor="#95a5a6"
-                  value={orderDetails.phone}
-                  onChangeText={(text) =>
-                    setOrderDetails((prev) => ({ ...prev, phone: text }))
-                  }
-                  keyboardType="phone-pad"
-                  returnKeyType="done"
-                  maxLength={11}
-                  editable={!isSubmitting}
-                />
-
-                {keyboardHeight === 0 && (
-                  <View style={styles.orderSummary}>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Product:</Text>
-                      <Text style={styles.summaryValue}>{product.name}</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Quantity:</Text>
-                      <Text style={styles.summaryValue}>{quantity}</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Unit Price:</Text>
-                      <Text style={styles.summaryValue}>
-                        ৳ {product.price.toLocaleString()}
-                      </Text>
-                    </View>
-                    <View style={[styles.summaryRow, styles.totalRow]}>
-                      <Text style={[styles.summaryLabel, styles.totalLabel]}>
-                        Total:
-                      </Text>
-                      <Text style={[styles.summaryValue, styles.totalValue]}>
-                        ৳ {totalAmount}
-                      </Text>
-                    </View>
+              <View style={styles.popupContent}>
+                <View style={styles.modalHeaderMinimal}>
+                  <Text style={styles.modalTitleMinimal}>Order</Text>
+                  <TouchableOpacity
+                    style={styles.closeButtonMinimal}
+                    onPress={() => !isSubmitting && setIsModalVisible(false)}
+                    disabled={isSubmitting}
+                  >
+                    <Ionicons name="close" size={22} color="#888" />
+                  </TouchableOpacity>
+                </View>
+                {/* Show user info instead of input fields */}
+                <View style={[styles.orderPopupInfoBox, { marginBottom: 18 }]}>
+                  <View style={styles.orderPopupRow}>
+                    <Ionicons name="person-circle" size={22} color="#8e24aa" style={{ marginRight: 8 }} />
+                    <Text style={styles.orderPopupLabel}>Name:</Text>
+                    <Text style={styles.orderPopupValue}>{user?.name || '-'}</Text>
                   </View>
-                )}
-              </ScrollView>
-
-              <TouchableOpacity
-                style={[styles.placeOrderButton, isSubmitting && styles.disabledButton]}
-                onPress={handlePlaceOrder}
-                activeOpacity={0.9}
-                disabled={isSubmitting}
-              >
-                <LinearGradient
-                  colors={["#4b7bec", "#3867d6"]}
-                  style={styles.placeOrderGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
+                  <View style={styles.orderPopupRow}>
+                    <Ionicons name="school" size={20} color="#8e24aa" style={{ marginRight: 8 }} />
+                    <Text style={styles.orderPopupLabel}>Student ID:</Text>
+                    <Text style={styles.orderPopupValue}>{user?.studentId || '-'}</Text>
+                  </View>
+                  <View style={styles.orderPopupRow}>
+                    <Ionicons name="call" size={20} color="#8e24aa" style={{ marginRight: 8 }} />
+                    <Text style={styles.orderPopupLabel}>Phone:</Text>
+                    <Text style={styles.orderPopupValue}>{user?.phoneNumber || '-'}</Text>
+                  </View>
+                  <View style={styles.orderPopupRow}>
+                    <Ionicons name="restaurant" size={20} color="#8e24aa" style={{ marginRight: 8 }} />
+                    <Text style={styles.orderPopupLabel}>Restaurant:</Text>
+                    <Text style={styles.orderPopupValue}>{product.restaurant_name || '-'}</Text>
+                  </View>
+                </View>
+                <View style={styles.orderSummaryMinimal}>
+                  <Text style={styles.summaryMinimal}>
+                    {quantity} × {product.name} = ৳ {totalAmount}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.placeOrderButtonMinimal, isSubmitting && styles.disabledButton]}
+                  onPress={handlePlaceOrder}
+                  activeOpacity={0.9}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.placeOrderButtonText}>Confirm Order</Text>
+                    <Text style={styles.placeOrderButtonTextMinimal}>Confirm Order</Text>
                   )}
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
+                </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={showSuccessModal}
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <View style={styles.popupOverlay}>
+            <View style={styles.popupContainer}>
+              <View style={styles.popupContent}>
+                <Ionicons name="checkmark-circle" size={48} color="#4BB543" style={{ alignSelf: 'center', marginBottom: 10 }} />
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#222', textAlign: 'center', marginBottom: 10 }}>Order Submitted Successfully!</Text>
+                <Text style={{ fontSize: 15, color: '#444', textAlign: 'center', marginBottom: 20 }}>Thank you for your order. You can go to home or show your QR now.</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.placeOrderButtonMinimal, { flex: 1, backgroundColor: '#3867d6' }]}
+                    onPress={() => {
+                      setShowSuccessModal(false);
+                      router.replace("/");
+                    }}
+                  >
+                    <Text style={styles.placeOrderButtonTextMinimal}>Go to Home</Text>
+                  </TouchableOpacity>
+                  {/* <TouchableOpacity
+                    style={[styles.placeOrderButtonMinimal, { flex: 1, backgroundColor: '#8e24aa' }]}
+                    onPress={() => {
+                      setShowSuccessModal(false);
+                      router.push("/order/qr"); 
+                    }}
+                  >
+                    <Text style={styles.placeOrderButtonTextMinimal}>Show QR Now</Text>
+                  </TouchableOpacity> */}
+                  <TouchableOpacity
+                    style={[styles.placeOrderButtonMinimal, { flex: 1, backgroundColor: '#8e24aa' }]}
+                    onPress={() => {
+                      const data = {
+                        orderId: qrOrderId,
+                        userId: qrUserId,
+                      };
+
+                      const encodedData = encodeURIComponent(JSON.stringify(data));
+
+                      setShowSuccessModal(false);
+                      router.push({
+                        pathname: "/order/qr",
+                        params: { data: encodedData },
+                      });
+                    }}
+                  >
+                    <Text style={styles.placeOrderButtonTextMinimal}>Show QR Now</Text>
+                  </TouchableOpacity>
+
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
@@ -478,300 +437,263 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.7,
   },
-  safeArea: {
+  // Minimalist styles
+  safeAreaMinimal: {
     flex: 1,
-    backgroundColor: "#f5f6fa",
-  },
-  scrollContainer: {
-    paddingBottom: 30,
-  },
-  imageContainer: {
-    width: "100%",
-    height: 380,
     backgroundColor: "#fff",
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+  },
+  scrollContainerMinimal: {
+    paddingBottom: 24,
+    paddingHorizontal: 0,
+  },
+  imageContainerMinimal: {
+    width: "100%",
+    height: 260,
+    backgroundColor: "#f5f6fa",
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 8,
     position: "relative",
+    marginBottom: 0,
   },
-  loaderContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-    backgroundColor: "rgba(255,255,255,0.7)",
-  },
-  productImage: {
+  productImageMinimal: {
     width: "100%",
     height: "100%",
+    borderRadius: 0,
   },
-  backButton: {
+  backButtonMinimal: {
     position: "absolute",
-    top: 40,
-    left: 20,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    padding: 10,
-    borderRadius: 20,
+    top: 18,
+    left: 16,
+    backgroundColor: "#fff",
+    padding: 6,
+    borderRadius: 16,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
     zIndex: 2,
   },
-  contentContainer: {
-    paddingHorizontal: 25,
-    paddingTop: 30,
+  contentContainerMinimal: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
     backgroundColor: "#fff",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 5,
-    marginTop: -20,
   },
-  titleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 15,
-  },
-  productName: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#2d3436",
-    flex: 1,
-    paddingRight: 15,
-    lineHeight: 34,
+  productNameMinimal: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#222",
+    marginBottom: 4,
     fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
   },
-  ratingContainer: {
+  ratingContainerMinimal: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(243, 156, 18, 0.15)",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    marginBottom: 8,
   },
-  ratingText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#e67e22",
+  ratingTextMinimal: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#f39c12",
     marginLeft: 4,
     fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
-  price: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#4b7bec",
-    marginBottom: 25,
+  priceMinimal: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#ff0000",
+    marginBottom: 18,
     fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
   },
-  section: {
-    marginBottom: 25,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#2d3436",
-    marginBottom: 10,
-    fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
-  },
-  sectionContent: {
+  sectionContentMinimal: {
     fontSize: 15,
-    fontWeight: "500",
-    color: "#636e72",
-    lineHeight: 22,
+    color: "#444",
+    marginBottom: 18,
     fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
-  specialitiesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  specialityTag: {
-    backgroundColor: "#f1f2f6",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginRight: 10,
-    marginBottom: 10,
-  },
-  specialityText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#2d3436",
-    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
-  },
-  quantityContainer: {
-    marginBottom: 25,
-  },
-  quantityLabel: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#2d3436",
-    marginBottom: 12,
-    fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
-  },
-  quantityControls: {
+  quantityContainerMinimal: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+    gap: 0,
   },
-  quantityButton: {
+  quantityButtonMinimal: {
     borderWidth: 1,
-    borderColor: "#4b7bec",
-    borderRadius: 20,
-    padding: 8,
+    borderColor: "#e1e4ea",
+    borderRadius: 16,
+    padding: 6,
+    marginHorizontal: 8,
+    backgroundColor: "#f8f9fb",
   },
-  quantityValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#4b7bec",
-    marginHorizontal: 25,
+  quantityValueMinimal: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#222",
+    marginHorizontal: 8,
     fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
   },
-  orderButton: {
-    borderRadius: 40,
-    overflow: "hidden",
-    marginBottom: 40,
+  orderButtonMinimal: {
+    borderRadius: 32,
+    backgroundColor: "#e74c3c", // red
+    marginTop: 8,
+    marginBottom: 32,
+    paddingVertical: 14,
+    alignItems: "center",
   },
-  gradient: {
-    paddingVertical: 16,
-    borderRadius: 40,
-  },
-  orderButtonText: {
-    fontSize: 18,
+  orderButtonTextMinimal: {
+    fontSize: 17,
     fontWeight: "700",
     color: "#fff",
-    textAlign: "center",
     fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
   },
-  modalContainer: {
+  // Modal minimalist
+  modalContainerMinimal: {
     flex: 1,
     justifyContent: "flex-end",
   },
-  modalOverlay: {
+  modalOverlayMinimal: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.12)",
     zIndex: 10,
   },
-  modalContent: {
+  modalContentMinimal: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 25,
-    paddingTop: 15,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    padding: 22,
     zIndex: 20,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 20,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 8,
   },
-  modalHeader: {
+  modalHeaderMinimal: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 10,
   },
-  modalTitle: {
-    fontSize: 22,
+  modalTitleMinimal: {
+    fontSize: 18,
     fontWeight: "700",
-    color: "#2d3436",
+    color: "#222",
     fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
   },
-  closeButton: {
-    padding: 6,
+  closeButtonMinimal: {
+    padding: 4,
   },
-  modalScroll: {
-    maxHeight: 250,
-  },
-  modalScrollContent: {
-    paddingBottom: 15,
-  },
-  input: {
+  inputMinimal: {
     borderWidth: 1,
-    borderColor: "#dfe6e9",
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 15,
-    color: "#2d3436",
+    borderColor: "#e1e4ea",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    marginBottom: 12,
+    color: "#222",
     fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
   },
-  orderSummary: {
-    marginTop: 10,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#636e72",
-    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2d3436",
-    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
-  },
-  totalRow: {
-    marginTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: "#dfe6e9",
-    paddingTop: 8,
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  placeOrderButton: {
-    marginTop: 15,
-    borderRadius: 40,
-    overflow: "hidden",
-  },
-  placeOrderGradient: {
-    paddingVertical: 14,
-    borderRadius: 40,
-    justifyContent: "center",
+  orderSummaryMinimal: {
+    marginVertical: 10,
     alignItems: "center",
   },
-  placeOrderButtonText: {
-    fontSize: 18,
+  summaryMinimal: {
+    fontSize: 15,
+    color: "#444",
+    fontWeight: "600",
+    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
+  },
+  placeOrderButtonMinimal: {
+    borderRadius: 32,
+    backgroundColor: "#e74c3c", // red
+    marginTop: 8,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  placeOrderButtonTextMinimal: {
+    fontSize: 16,
     fontWeight: "700",
     color: "#fff",
     fontFamily: Platform.OS === "ios" ? "SF Pro Display" : "Roboto",
+  },
+  specialitiesBoxMinimal: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    backgroundColor: "transparent",
+    borderRadius: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    marginBottom: 16,
+    marginTop: 2,
+  },
+  specialityTagMinimalBox: {
+    backgroundColor: "#f3e8ff", // light purple
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  specialityMinimalTextBox: {
+    color: "#8e24aa", // purple
+    fontWeight: "600",
+    fontSize: 13,
+    fontFamily: Platform.OS === "ios" ? "SF Pro Text" : "Roboto",
+  },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  popupContainer: {
+    width: '90%',
+    maxWidth: 400,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  popupContent: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 22,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 200,
+  },
+  orderPopupInfoBox: {
+    backgroundColor: '#f8f6ff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#8e24aa',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  orderPopupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderPopupLabel: {
+    fontSize: 14,
+    color: '#8e24aa',
+    fontWeight: '700',
+    marginRight: 4,
+  },
+  orderPopupValue: {
+    fontSize: 14,
+    color: '#222',
+    fontWeight: '500',
   },
 });
 

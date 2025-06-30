@@ -26,7 +26,7 @@ const Home = () => {
   }, []);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container]} className="bg-red-800">
       {/* Sticky Header */}
       <View style={styles.headerContainer}>
         <HeaderWithSearch />
@@ -34,6 +34,7 @@ const Home = () => {
 
       {/* Content */}
       <FlatList
+        className="bg-white"
         data={[]}
         keyExtractor={(_, index) => `empty-${index}`}
         renderItem={null}
@@ -45,11 +46,12 @@ const Home = () => {
           />
         }
         ListHeaderComponent={
-          <View style={styles.contentContainer}>
-            <OffersSection />
-            <PopularCuisinesCarousel />
-            <OurBengaliItemsCarousel />
+          <View style={styles.contentContainer} className="">
+            {/* <OffersSection /> */}
+            {/* <PopularCuisinesCarousel /> */}
+            {/* <OurBengaliItemsCarousel /> */}
             <AllRestaurants />
+            
             <OurMenu />
             {/* <ComboOffers /> */}
           </View>
@@ -65,6 +67,7 @@ const Home = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    marginBottom : 25
   },
   headerContainer: {
     zIndex: 10,
@@ -77,8 +80,8 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   listContent: {
-    paddingBottom: 16,
-  flexGrow: 1,
+    paddingBottom: 1,
+    flexGrow: 1,
   },
 });
 

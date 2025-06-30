@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { fetchAPI } from "@/lib/fetch";
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -9,9 +8,11 @@ import {
   Dimensions,
 } from "react-native";
 import Carousel from "react-native-reanimated-carousel";
+import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
 
 type Offer = {
-  id: number;
+  _id: string;
   title: string;
   discount: number;
   image: string;
@@ -24,6 +25,7 @@ const horizontalPadding = 20;
 const sliderItemWidth = width - horizontalPadding * 2;
 
 const OffersSection = () => {
+  const { token } = useAuth();
   const carouselRef = useRef(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,13 @@ const OffersSection = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchAPI("/(api)/offer");
+      const response = await axios.get("https://ourcanteennbackend.vercel.app/api/offer", {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = response.data;
       if (!Array.isArray(data)) throw new Error("Invalid response format");
       setOffers(data);
     } catch (err: any) {
@@ -59,7 +67,7 @@ const OffersSection = () => {
           source={{ uri: item }}
           style={{
             width: "100%",
-            height: 180,
+            height: "100%",
             borderRadius: 10,
           }}
           resizeMode="cover"
@@ -90,7 +98,7 @@ const OffersSection = () => {
           <Carousel
             ref={carouselRef}
             width={sliderItemWidth}
-            height={180}
+            height={200}
             data={sliderImages}
             renderItem={renderSliderItem}
             loop
@@ -111,12 +119,13 @@ const OffersSection = () => {
         ) : (
           <View
             style={{
-              height: 180,
+              height: 200,
               width: "100%",
               justifyContent: "center",
               alignItems: "center",
               backgroundColor: "#f0f0f0",
               borderRadius: 10,
+              
             }}
           >
             <Text style={{ color: "#888" }}>
